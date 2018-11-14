@@ -30,11 +30,64 @@ app.get('/cities/:id', async (req, res) => {
         return
     }
 
+    try {
+            //console.log(url)
+            const mapq_response = await fetch(MAPQUEST_URL+'los%20angeles,ca', {
+                headers: {
+                    'Accept' : 'application/json',
+                }
+            })
+            const mapq_json = await mapq_response.json()
+            latlon = mapq_json.results[0].locations[0].latLng
+            //console.log('\nlatlon in asynch ', latlon)
+
+            const sun_response = await fetch(SUN_URI+'?lat=' + latlon.lat+ '&lng=' +latlon.lng, {
+                headers: {
+                    'Accept' : 'application/json',
+                }
+            })
+            const sun_json = await sun_response.json()
+
+            res.status(200)
+            res.send(sun_json.results)
+        } catch (error) {
+            res.sendstatus(500)
+            console.log('\n\nerror', error)
+
+        }
 })
 
 app.get('/cities', async (req, res) => {
 
     try {
+
+        const map_results = await Promise.all(cities_supported.map(city => {
+            const url = MAPQUEST_URL+encodeURIComponent(city.name)+','+encodeURIComponent(city.state)
+            console.log(url)
+            return fetch(url, {
+                headers: {
+                    'Accept' : 'application/json',
+                }
+            })
+                .then((response) => response.json())
+                .then((json) => {
+                    //console.log(json)
+                    return json.results[0].locations[0].latLng
+                } )
+        })
+        )
+
+        const sun_results = await Promise.all (map_results.map( latlon => {
+            return fetch(SUN_URI+'?lat=' + latlon.lat+ '&lng=' +latlon.lng, {
+                headers: {
+                    'Accept' : 'application/json',
+                }
+            }).then((response) => response.json())
+        } ))
+        
+
+
+        console.log('\n\nsending', sun_results)
 
         res.status(200)
         res.send(sun_results)
